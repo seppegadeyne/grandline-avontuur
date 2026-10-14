@@ -184,6 +184,10 @@ function show_infobox() {
             -webkit-tap-highlight-color: transparent;
         }
         body { position: fixed; inset: 0; }
+        /* desktop: canvas over de volle breedte; is het venster te laag, dan mag de pagina verticaal scrollen */
+        html.ga-desktop, html.ga-desktop body { overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+        html.ga-desktop body { position: relative; inset: auto; touch-action: auto; }
+        html.ga-desktop::-webkit-scrollbar, html.ga-desktop body::-webkit-scrollbar { display: none; }
 
         #transfer { position: fixed; left: 0; right: 0; top: 40%; text-align: center; color: #ffd23c; z-index: 20; }
         #status { font-weight: bold; margin-bottom: 10px; }
@@ -318,6 +322,8 @@ function show_infobox() {
         const touch = gaIsTouch()
         const portrait = vh > vw
         document.body.classList.toggle("ga-touch", touch)
+        document.documentElement.classList.toggle("ga-desktop", !touch)
+        if (touch) document.body.style.height = ""
         document.body.classList.toggle("ga-portrait", portrait)
         document.body.classList.toggle("ga-landscape", !portrait)
         let w, h, left, top
@@ -328,8 +334,14 @@ function show_infobox() {
             if (vh - h < minPad) { h = Math.max(120, vh - minPad); w = Math.round(h * ar) }
             left = Math.round((vw - w) / 2); top = 0
             pad.style.left = "0px"; pad.style.right = "0px"; pad.style.top = h + "px"; pad.style.bottom = "0px"
+        } else if (!touch) {
+            // desktop: volle breedte met bijhorende hoogte; is dat hoger dan het venster, dan scroll je met de muis
+            w = document.documentElement.clientWidth; h = Math.round(w / ar)
+            left = 0; top = 0
+            document.body.style.height = h + "px"  // canvas is absoluut: body moet de hoogte dragen voor scrollen
+            pad.style.left = "0px"; pad.style.right = "0px"; pad.style.top = "0px"; pad.style.bottom = "0px"
         } else {
-            // liggend of desktop: zo groot mogelijk, gecentreerd; knoppen zweven erover
+            // liggend op telefoon/tablet: zo groot mogelijk, gecentreerd; knoppen zweven erover
             w = vw; h = Math.round(vw / ar)
             if (h > vh) { h = vh; w = Math.round(vh * ar) }
             left = Math.round((vw - w) / 2); top = Math.round((vh - h) / 2)
@@ -467,6 +479,10 @@ function show_infobox() {
         }
         document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAll() })
         window.addEventListener("blur", releaseAll)
+
+        // spel-toetsen (pijltjes, spatie) mogen de pagina niet laten scrollen
+        const GAME_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "PageUp", "PageDown", "Home", "End"]
+        window.addEventListener("keydown", (e) => { if (GAME_KEYS.includes(e.key)) e.preventDefault() }, { capture: true })
 
         window.addEventListener("resize", gaLayout)
         window.addEventListener("orientationchange", () => setTimeout(gaLayout, 150))
