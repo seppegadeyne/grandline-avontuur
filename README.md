@@ -40,7 +40,13 @@ All graphics are drawn in code and all sound effects are synthesized at runtime,
 | Football: sprint | Shift |
 | Pause / back | Esc |
 
-The game needs a keyboard. It is not playable on phones or tablets yet.
+### Phones and tablets
+
+In the browser the game also works with touch, in portrait and in landscape. Once you touch the screen,
+on-screen controls appear: a joystick on the left to walk (and to move through menus) and buttons on the
+right for attack, dash, special, talk, eat and switching weapons. In portrait the game sits at the top
+of the screen with the controls below it. In landscape the buttons float over the game. Menus, shop items,
+riddle answers and islands on the map can also be tapped directly.
 
 ## Run on the desktop
 
@@ -97,9 +103,11 @@ grandline/
   world.py           islands, NPCs, riddles
   combat.py          player, enemies, weapons, bosses
   football.py        football matches
+  touch.py           touch controls (reads the on-screen joystick and buttons in the browser)
   art.py             procedural drawing of characters, dragons and ships
   settings.py        constants and all game content
 scripts/build_web.py WebAssembly build for the browser
+web/index.tmpl       pygbag page template: mobile layout and on-screen controls
 tests/smoke_test.py  headless smoke test
 vercel.json          Vercel build configuration
 ```

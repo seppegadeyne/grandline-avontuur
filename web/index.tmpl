@@ -1,0 +1,503 @@
+<html lang="en-us"><script src="{{cookiecutter.cdn}}pythons.js" type=module id="site" data-python="python{{cookiecutter.PYBUILD}}" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#<!--
+
+print("""
+Loading {{cookiecutter.title}} from {{cookiecutter.archive}}.apk
+    Pygbag Version : {{cookiecutter.version}}
+    Template Version : 0.9.3
+    Python  : {{cookiecutter.PYBUILD}}
+    CDN URL : {{cookiecutter.cdn}}
+    Screen  : {{cookiecutter.width}}x{{cookiecutter.height}}
+    Title   : {{cookiecutter.title}}
+    Folder  : {{cookiecutter.directory}}
+    Authors : {{cookiecutter.authors}}
+    SPDX-License-Identifier: {{cookiecutter.spdx}}
+
+""")
+
+import sys
+import asyncio
+import platform
+import json
+from pathlib import Path
+
+# do not rename
+async def custom_site():
+    import embed
+    platform.document.body.style.background = "#0b1a33"
+
+    platform.window.transfer.hidden = true
+    platform.window.canvas.style.visibility = "visible"
+
+
+    bundle = "{{cookiecutter.archive}}"
+
+    # the C or js loader could do that but be explicit.
+    appdir = Path(f"/data/data/{bundle}") # /data/data/{{cookiecutter.archive}}
+    appdir.mkdir()
+
+
+    # unpack filesystem from compressed archive into work dir
+    if platform.window.location.host.find('.itch.zone')>0:
+        import zipfile
+        async with platform.fopen("{{cookiecutter.archive}}.apk", "rb") as archive:
+            with zipfile.ZipFile(archive) as zip_ref:
+                zip_ref.extractall(appdir.as_posix())
+    else:
+        import tarfile
+        async with platform.fopen("{{cookiecutter.archive}}.tar.gz", "rb") as archive:
+            tar = tarfile.open(fileobj=archive, mode="r:gz")
+            tar.extractall(path=appdir.as_posix(), filter='tar')
+            tar.close()
+
+    # preloader will change to work dir and prepend it to sys.path
+    platform.run_main(PyConfig, loaderhome= appdir / "assets", loadermain=None)
+
+
+    # wait preloading complete : that includes images and wasm compilation of bundled modules
+    while embed.counter()<0:
+        await asyncio.sleep(.1)
+
+    main = appdir / "assets" / "main.py"
+
+    # TODO: test for window.webkitAudioContext and block aio loop until gesture if accessing media manager play
+    # before a gesture is recorded ( touch or click )
+
+    # test/wait user media interaction
+    if not platform.window.MM.UME:
+
+        # now that apk is mounted we have access to font cache
+        # but we need to fill __file__ that is not yet set
+        __import__(__name__).__file__ = main
+
+        # now make a prompt
+        msg  = "Tik om te spelen!"
+        platform.window.infobox.innerText = msg
+        print("\n"*4, f"    * Waiting for media user engagement. {msg} *" , "\n"*4)
+
+        while not platform.window.MM.UME:
+            await asyncio.sleep(.1)
+
+    # start async top level machinery if not started and add a console in any case if requested.
+    await TopLevel_async_handler.start_toplevel(platform.shell, console=window.python.config.debug)
+
+    # now that apk is mounted we have access to font cache
+    # but we need to fill __file__/__name__ that are not yet set
+    __import__(__name__).__file__ = main
+
+
+    def ui_callback(pkg):
+        platform.window.infobox.innerText = f"installing {pkg}"
+
+    await shell.source(main, callback=ui_callback)
+
+    # if you don't reach that step
+    # your main.py has an infinite sync loop somewhere !
+
+    platform.window.infobox.style.display = "none"
+    platform.window.config.gui_divider = 1
+    platform.window.window_resize()
+    print("default.tmpl: done")
+
+    shell.interactive()
+
+asyncio.run( custom_site() )
+
+
+
+
+
+
+
+
+
+
+
+
+# BEGIN BLOCK
+#
+# now this is the html part you can (and should) customize
+# It is not mandatory : pygame-script when it reads the first line (also called
+# shebang ) of above code create absolute minimal widget set
+# required for running with default rules
+#
+# do not alter that comment block it is separating python code from html code
+# =============================================================================
+# --></script><head><!--
+//=============================================================================
+//
+//
+//
+//
+//
+//
+//
+
+    {%- if cookiecutter.comment != "" -%}
+{{cookiecutter.comment}}
+    {% endif %}
+
+--><script type="application/javascript">
+// END BLOCK
+
+// Grand Line Avontuur: eigen pygbag-template met touch-besturing voor telefoons.
+// Python leest de besturing via window.gaTouchPoll() en zet de knoppen via window.gaSetMode().
+
+config = {
+    xtermjs : "{{cookiecutter.xtermjs}}" ,
+    _sdl2 : "canvas",
+    user_canvas : 0,
+    user_canvas_managed : 1,
+    gui_divider : 1,
+    ume_block : {{cookiecutter.ume_block}},
+    can_close : {{cookiecutter.can_close}},
+    archive : "{{cookiecutter.archive}}",
+    gui_debug : 2,
+    cdn : "{{cookiecutter.cdn}}",
+    autorun : {{cookiecutter.autorun}},
+    PYBUILD : "{{cookiecutter.PYBUILD}}",
+    fb_ar   :  1.77,
+    fb_width : "{{cookiecutter.width}}",
+    fb_height : "{{cookiecutter.height}}"
+}
+
+function show_infobox() {
+    infobox.style.display = "block";
+}
+
+</script>
+
+    <title>{{cookiecutter.title}}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0b1a33">
+    <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+
+    <style>
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; overscroll-behavior: none;
+            background: #0b1a33; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body { position: fixed; inset: 0; }
+
+        #transfer { position: fixed; left: 0; right: 0; top: 40%; text-align: center; color: #ffd23c; z-index: 20; }
+        #status { font-weight: bold; margin-bottom: 10px; }
+        #progress { height: 14px; width: 240px; accent-color: #ffd23c; }
+
+        #infobox {
+            position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            background: #ffd23c; color: #0b1a33; font-weight: 800; font-size: 22px;
+            padding: 18px 30px; border-radius: 16px; border: 4px solid #0b1a33;
+            box-shadow: 0 6px 0 #9a7a10; z-index: 999999; text-align: center; max-width: 80vw; cursor: pointer;
+        }
+
+        /* de canvas mag geen rand of padding hebben, anders kloppen de muis-/tikcoördinaten niet */
+        canvas.emscripten {
+            border: 0 none; padding: 0; margin: 0; background: transparent;
+            position: absolute; z-index: 5; image-rendering: auto; touch-action: none;
+        }
+
+        /* ---------------- touch-besturing ---------------- */
+        #ga-pad { position: fixed; z-index: 50; pointer-events: none; display: none; }
+        body.ga-touch #ga-pad { display: block; }
+        body.ga-portrait #ga-pad { background: linear-gradient(#10264a, #0b1a33); }
+
+        #ga-stick-zone { position: absolute; left: 0; bottom: 0; width: 50%; height: 100%; pointer-events: auto; touch-action: none; }
+        body.ga-landscape #ga-stick-zone { width: 38%; height: 62%; }
+        body.ga-nostick #ga-stick-zone { display: none; }
+        /* liggend in menu's/kaart: geen joystick over het beeld, zodat je eilanden en menu-items kunt aantikken */
+        body.ga-landscape.ga-menu #ga-stick-zone { display: none; }
+        #ga-stick-base {
+            position: absolute; width: 132px; height: 132px; margin: -66px 0 0 -66px; border-radius: 50%;
+            background: rgba(255,255,255,0.10); border: 3px solid rgba(255,255,255,0.35); pointer-events: none;
+        }
+        #ga-stick-knob {
+            position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%;
+            background: rgba(255,210,60,0.85); border: 3px solid #0b1a33; pointer-events: none;
+        }
+
+        .ga-btn {
+            position: absolute; pointer-events: auto; touch-action: none; display: none;
+            border-radius: 50%; border: 3px solid rgba(11,26,51,0.9);
+            background: rgba(30,60,120,0.78); color: #fff; font-weight: 800; font-size: 14px;
+            align-items: center; justify-content: center; text-align: center; line-height: 1.05;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.35);
+        }
+        .ga-btn.on { display: flex; }
+        .ga-btn.held { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.35); filter: brightness(1.3); }
+        .ga-btn.primary { background: rgba(220,60,60,0.88); font-size: 18px; }
+        .ga-btn.small { border-radius: 12px; background: rgba(20,30,55,0.8); font-size: 13px; }
+        body.ga-landscape .ga-btn { opacity: 0.82; }
+    </style>
+
+    <script src="{{cookiecutter.cdn}}/browserfs.min.js"></script>
+</head>
+
+<body>
+
+    <div id="transfer">
+        <div class="emscripten" id="status">Downloading...</div>
+        <div class="emscripten"><progress value="0" max="100" id="progress"></progress></div>
+    </div>
+
+    <canvas class="emscripten" id="canvas" width="1px" height="1px" oncontextmenu="event.preventDefault()" tabindex=1></canvas>
+    <canvas class="emscripten" id="canvas3d" width="1280px" height="720px" oncontextmenu="event.preventDefault()" tabindex=1 hidden></canvas>
+
+    <div id="infobox">Laden, even geduld...</div>
+
+    <div id="ga-pad">
+        <div id="ga-stick-zone"><div id="ga-stick-base"><div id="ga-stick-knob"></div></div></div>
+        <div class="ga-btn primary" data-a="attack"></div>
+        <div class="ga-btn primary" data-a="ok"></div>
+        <div class="ga-btn" data-a="dash"></div>
+        <div class="ga-btn" data-a="special"></div>
+        <div class="ga-btn" data-a="use"></div>
+        <div class="ga-btn" data-a="eat"></div>
+        <div class="ga-btn" data-a="weapon"></div>
+        <div class="ga-btn small" data-a="pause"></div>
+        <div class="ga-btn small" data-a="journal"></div>
+        <div class="ga-btn small" data-a="shop"></div>
+        <div class="ga-btn small" data-a="back"></div>
+    </div>
+
+    <div id=html></div>
+    <div id=crt hidden>
+        <div id="system" hidden></div>
+        <div id=box hidden><div id="info"></div>
+            <iframe id="iframe" name="iframe" width="1" height="1" sandbox="allow-same-origin allow-scripts" src="{{cookiecutter.cdn}}empty.html"></iframe>
+        </div>
+    </div>
+    <div id="dlg" hidden><input type="file" id="dlg_multifile" multiple accept="image/*"></div>
+    <div id="pyconsole" hidden><div id="terminal" tabIndex=1 align="left"></div></div>
+
+    <script type="application/javascript">
+
+    globalThis.__canvas_resized = (self, ecw, ech) => {}
+
+    // ------------------------------------------------------------ touch-besturing
+    const GA = {
+        mx: 0, my: 0, down: [], up: [], touch: false, mode: "menu",
+        stickId: null, cx: 0, cy: 0, held: {},
+    }
+
+    // per modus: welke knoppen, met welk opschrift; null = knop verbergen
+    const GA_MODES = {
+        menu:     { stick: true, btn: { ok: "OK", back: "Terug" } },
+        map:      { stick: true, btn: { ok: "Varen", shop: "Winkel", journal: "Dagboek", pause: "Menu" } },
+        island:   { stick: true, btn: { attack: "Slaan", dash: "Dash", special: "Super", use: "Praat", eat: "Eten",
+                                        weapon: "Wapen", journal: "Dagboek", pause: "Pauze" } },
+        boss:     { stick: true, btn: { attack: "Slaan", dash: "Dash", special: "Super", eat: "Eten", weapon: "Wapen",
+                                        pause: "Pauze" } },
+        football: { stick: true, btn: { attack: "Schiet", dash: "Sprint", pause: "Stop" } },
+    }
+
+    // posities: [rechts, onder, diameter] in px vanaf de rechteronderhoek van het besturingsvlak.
+    // Boog rond de grote knop; het geheel is max. 190 px breed en 283 px hoog (vóór schalen).
+    const GA_POS = {
+        attack: [16, 24, 92], ok: [16, 24, 92],
+        dash: [124, 37, 66], special: [29, 137, 66], use: [105, 110, 60],
+        weapon: [122, 197, 56], eat: [34, 227, 56],
+    }
+    const GA_CLUSTER_W = 190, GA_CLUSTER_H = 283
+    const GA_TOP = ["back", "shop", "journal", "pause"]  // kleine knoppen bovenaan rechts
+
+    function gaIsTouch() {
+        return GA.touch || (window.matchMedia && matchMedia("(pointer: coarse)").matches)
+    }
+
+    function gaLayout() {
+        const c = document.getElementById("canvas")
+        const pad = document.getElementById("ga-pad")
+        const vw = window.innerWidth, vh = window.innerHeight
+        const ar = 16 / 9
+        const touch = gaIsTouch()
+        const portrait = vh > vw
+        document.body.classList.toggle("ga-touch", touch)
+        document.body.classList.toggle("ga-portrait", portrait)
+        document.body.classList.toggle("ga-landscape", !portrait)
+        let w, h, left, top
+        if (portrait && touch) {
+            // rechtop: spel bovenaan over de volle breedte, besturing in de ruimte eronder
+            w = vw; h = Math.round(vw / ar)
+            const minPad = 250
+            if (vh - h < minPad) { h = Math.max(120, vh - minPad); w = Math.round(h * ar) }
+            left = Math.round((vw - w) / 2); top = 0
+            pad.style.left = "0px"; pad.style.right = "0px"; pad.style.top = h + "px"; pad.style.bottom = "0px"
+        } else {
+            // liggend of desktop: zo groot mogelijk, gecentreerd; knoppen zweven erover
+            w = vw; h = Math.round(vw / ar)
+            if (h > vh) { h = vh; w = Math.round(vh * ar) }
+            left = Math.round((vw - w) / 2); top = Math.round((vh - h) / 2)
+            pad.style.left = "0px"; pad.style.right = "0px"; pad.style.top = "0px"; pad.style.bottom = "0px"
+        }
+        c.style.left = left + "px"; c.style.top = top + "px"
+        c.style.width = w + "px"; c.style.height = h + "px"
+        c.style.right = "auto"; c.style.bottom = "auto"; c.style.margin = "0"
+        gaPlaceButtons()
+        if (GA.stickId === null) gaResetStick()  // niet resetten terwijl een vinger de joystick vasthoudt
+    }
+
+    function gaPlaceButtons() {
+        const pad = document.getElementById("ga-pad")
+        const ph = pad.clientHeight, pw = pad.clientWidth
+        const portrait = document.body.classList.contains("ga-portrait")
+        // knoppen blijven in de rechterhelft (links zit de joystick) en onder de rij kleine knoppen
+        const k = Math.max(0.55, Math.min(portrait ? 1.3 : 0.85,
+                                          (pw * 0.5 - 14) / GA_CLUSTER_W, (ph - 64) / GA_CLUSTER_H))
+        const safeB = 12, safeR = 12
+        for (const el of document.querySelectorAll(".ga-btn")) {
+            const a = el.dataset.a
+            if (GA_POS[a]) {
+                const [r, b, d] = GA_POS[a]
+                el.style.right = (safeR + r * k) + "px"; el.style.bottom = (safeB + b * k) + "px"
+                el.style.width = el.style.height = (d * k) + "px"
+                el.style.top = "auto"; el.style.left = "auto"
+            }
+        }
+        // kleine knoppen in een rij bovenaan rechts
+        let x = 10
+        for (const a of GA_TOP) {
+            const el = document.querySelector(`.ga-btn[data-a="${a}"]`)
+            if (!el.classList.contains("on")) continue
+            el.style.width = "70px"; el.style.height = "38px"
+            el.style.top = "10px"; el.style.right = x + "px"; el.style.bottom = "auto"; el.style.left = "auto"
+            x += 78
+        }
+    }
+
+    function gaSetMode(mode) {
+        const m = GA_MODES[mode] || GA_MODES.menu
+        GA.mode = mode
+        document.body.classList.toggle("ga-nostick", !m.stick)
+        document.body.classList.toggle("ga-menu", mode === "menu" || mode === "map")
+        for (const el of document.querySelectorAll(".ga-btn")) {
+            const label = m.btn[el.dataset.a]
+            el.classList.toggle("on", !!label)
+            if (label) el.textContent = label
+            if (!label && GA.held[el.dataset.a]) { GA.up.push(el.dataset.a); delete GA.held[el.dataset.a]; el.classList.remove("held") }
+        }
+        gaPlaceButtons()
+    }
+    window.gaSetMode = gaSetMode
+
+    // door Python één keer per frame aangeroepen
+    function gaTouchPoll() {
+        const out = JSON.stringify({ mx: GA.mx, my: GA.my, down: GA.down, up: GA.up, active: gaIsTouch() })
+        GA.down = []; GA.up = []
+        return out
+    }
+    window.gaTouchPoll = gaTouchPoll
+
+    function gaResetStick() {
+        const zone = document.getElementById("ga-stick-zone")
+        const base = document.getElementById("ga-stick-base")
+        const knob = document.getElementById("ga-stick-knob")
+        GA.cx = zone.clientWidth / 2; GA.cy = zone.clientHeight - Math.min(zone.clientHeight / 2, 120)
+        base.style.left = GA.cx + "px"; base.style.top = GA.cy + "px"
+        knob.style.transform = "translate(0px, 0px)"
+        GA.mx = 0; GA.my = 0
+    }
+
+    function gaStickMove(ev) {
+        const zone = document.getElementById("ga-stick-zone").getBoundingClientRect()
+        const dx = ev.clientX - zone.left - GA.cx, dy = ev.clientY - zone.top - GA.cy
+        const R = 56
+        const len = Math.hypot(dx, dy)
+        const f = len > R ? R / len : 1
+        document.getElementById("ga-stick-knob").style.transform = `translate(${dx * f}px, ${dy * f}px)`
+        GA.mx = Math.max(-1, Math.min(1, dx / R)); GA.my = Math.max(-1, Math.min(1, dy / R))
+    }
+
+    function gaUnlock() {
+        // eerste aanraking = gebruikersinteractie: geluid en spel mogen starten
+        GA.touch = GA.touch || false
+        try { if (window.MM) window.MM.UME = true } catch (e) {}
+    }
+
+    function gaInit() {
+        const zone = document.getElementById("ga-stick-zone")
+        zone.addEventListener("pointerdown", (ev) => {
+            ev.preventDefault()
+            if (GA.stickId !== null) return
+            GA.stickId = ev.pointerId
+            zone.setPointerCapture(ev.pointerId)
+            const r = zone.getBoundingClientRect()
+            GA.cx = ev.clientX - r.left; GA.cy = ev.clientY - r.top
+            const base = document.getElementById("ga-stick-base")
+            base.style.left = GA.cx + "px"; base.style.top = GA.cy + "px"
+            gaStickMove(ev)
+        })
+        zone.addEventListener("pointermove", (ev) => { if (ev.pointerId === GA.stickId) { ev.preventDefault(); gaStickMove(ev) } })
+        const end = (ev) => { if (ev.pointerId === GA.stickId) { GA.stickId = null; gaResetStick() } }
+        zone.addEventListener("pointerup", end)
+        zone.addEventListener("pointercancel", end)
+
+        for (const el of document.querySelectorAll(".ga-btn")) {
+            const a = el.dataset.a
+            el.addEventListener("pointerdown", (ev) => {
+                ev.preventDefault(); ev.stopPropagation()
+                el.setPointerCapture(ev.pointerId)
+                if (!GA.held[a]) { GA.down.push(a); GA.held[a] = true; el.classList.add("held") }
+                if (navigator.vibrate) try { navigator.vibrate(8) } catch (e) {}
+            })
+            const up = (ev) => { if (GA.held[a]) { GA.up.push(a); delete GA.held[a]; el.classList.remove("held") } }
+            el.addEventListener("pointerup", up)
+            el.addEventListener("pointercancel", up)
+        }
+
+        window.addEventListener("touchstart", () => {
+            if (!GA.touch) { GA.touch = true; gaLayout() }
+        }, { passive: true, capture: true })
+        window.addEventListener("pointerdown", gaUnlock, { capture: true })
+        document.getElementById("infobox").addEventListener("click", gaUnlock)
+        // geen pinch-zoom / dubbeltik-zoom op iOS
+        document.addEventListener("gesturestart", (e) => e.preventDefault())
+        document.addEventListener("dblclick", (e) => e.preventDefault())
+
+        // app-wissel / scherm uit: alles loslaten, anders blijft een knop of de joystick 'ingedrukt'
+        const releaseAll = () => {
+            for (const a of Object.keys(GA.held)) { GA.up.push(a); delete GA.held[a] }
+            for (const el of document.querySelectorAll(".ga-btn.held")) el.classList.remove("held")
+            GA.stickId = null; gaResetStick()
+        }
+        document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAll() })
+        window.addEventListener("blur", releaseAll)
+
+        window.addEventListener("resize", gaLayout)
+        window.addEventListener("orientationchange", () => setTimeout(gaLayout, 150))
+        gaSetMode("menu")
+        gaLayout()
+        // de canvas krijgt pas later zijn echte grootte van SDL: nog even blijven bijstellen
+        let n = 0
+        const iv = setInterval(() => { gaLayout(); if (++n > 40) clearInterval(iv) }, 500)
+    }
+
+    async function custom_onload(debug_hidden) {
+        pyconsole.hidden = debug_hidden
+        transfer.hidden = debug_hidden
+        show_infobox()
+        gaInit()
+    }
+
+    function custom_prerun() {}
+    function custom_postrun() {}
+
+    function debug() {
+        python.config.debug = true
+        custom_onload(false)
+        Module.PyRun_SimpleString("shell.uptime()")
+    }
+
+    function info_inline(data) { document.getElementById("info").innerHTML = data }
+    function info_online(url) { fetch(url).then((r) => r.text()).then(info_inline).catch(console.warn) }
+    function frame_online(url) { window.frames["iframe"].location = url }
+
+    </script>
+
+</body>
+</html>

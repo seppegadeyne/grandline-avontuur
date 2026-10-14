@@ -283,7 +283,170 @@ def main():
     run(g, 0.3)
     shot(g, "18_kaart_eind")
     print("uitdagingen:", prof.done)
+    touch_tests(g)
     print("ALLES OK")
+
+
+def touch_tests(g):
+    """Touch-laag met een nep-bron: joystick, knoppen, modus, menunavigatie en tikken."""
+    from grandline.touch import TouchInput
+    state = {"mx": 0.0, "my": 0.0, "down": [], "up": [], "active": True}
+    modes = []
+
+    def source():
+        d = dict(state)
+        state["down"], state["up"] = [], []  # knoppen gelden maar één poll
+        return d
+
+    tc = TouchInput(source, set_mode=modes.append)
+    g.touch = tc
+    prof = g.profile
+
+    def frame(dt=1 / 60):
+        ev = tc.poll(g, dt)
+        g.step(dt, ev)
+        return ev
+
+    # (e) modusdetectie, set_mode alleen bij wijziging
+    g.replace(scenes.WorldMap(g))
+    frame()
+    frame()
+    assert modes == ["map"], modes
+    g.replace(world.IslandScene(g, 0))
+    close_overlays(g, world.IslandScene)
+    isl = g.stack[0]
+    isl.enemies.clear()
+    isl.respawn_t = 999
+    frame()
+    assert tc.mode == "island" and modes[-1] == "island" and len(modes) == 2, modes
+    g.push(scenes.Pause(g))
+    frame()
+    assert tc.mode == "menu" and modes[-1] == "menu", modes
+    g.pop()
+    frame()
+    assert tc.mode == "island"
+    n_modes = len(modes)
+    frame()
+    assert len(modes) == n_modes, "set_mode alleen bij verandering"
+
+    # (a) joystick naar rechts verplaatst de speler
+    x0 = isl.player.pos.x
+    state.update(mx=1.0, my=0.0)
+    for _ in range(30):
+        frame()
+    assert isl.player.pos.x > x0 + 50, (x0, isl.player.pos.x)
+    state.update(mx=0.1, my=0.0)  # binnen de dode zone
+    frame()
+    assert tc.move.length() == 0
+    state.update(mx=0.0, my=0.0)
+
+    # (d) wapen wisselen: volgende bezeten wapen
+    prof.weapons = [w for w in WEAPON_ORDER[:3]]
+    prof.weapon = WEAPON_ORDER[0]
+    state["down"] = ["weapon"]
+    ev = frame()
+    assert any(e.type == pygame.KEYDOWN and e.key == pygame.K_1 + 1 for e in ev), ev
+    assert prof.weapon == WEAPON_ORDER[1], prof.weapon
+    state["down"] = ["weapon"]
+    frame()
+    state["down"] = ["weapon"]
+    frame()
+    assert prof.weapon == WEAPON_ORDER[0], "wapens cyclen rond"
+
+    # (b) aanvallen in voetbal: KEYDOWN + KEYUP spatie
+    fb = FootballScene(g, 0, isl)
+    g.push(fb)
+    frame()
+    assert tc.mode == "football", tc.mode
+    fb.pause_t = 0
+    fb.ball = V(fb.me.pos) + V(20, 0)
+    fb.bvel = V()
+    fb.me.look = V(1, 0)
+    state["down"] = ["attack"]
+    ev = frame()
+    assert [e.type for e in ev] == [pygame.KEYDOWN] and ev[0].key == pygame.K_SPACE
+    assert fb.charging
+    for _ in range(10):
+        frame()
+    kicks = []
+    orig_kick = fb.try_kick
+    fb.try_kick = lambda *a: kicks.append(a) or orig_kick(*a)
+    state["up"] = ["attack"]
+    ev = frame()
+    assert [e.type for e in ev] == [pygame.KEYUP] and ev[0].key == pygame.K_SPACE
+    assert not fb.charging and len(kicks) == 1, "KEYUP moet een schot proberen"
+    del fb.try_kick
+    # touch-joystick beweegt de voetballer
+    x0 = fb.me.pos.x
+    state.update(mx=1.0, my=0.0)
+    for _ in range(20):
+        frame()
+    assert fb.me.pos.x > x0, (x0, fb.me.pos.x)
+    state.update(mx=0.0, my=0.0)
+    fb.finish()
+    frame()
+    assert tc.mode == "menu", tc.mode
+    pygame.event.clear()
+    tap = pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=(640, 360), button=1)
+    g.step(1 / 60, [tap])
+    assert top(g) is fb, "een tik meteen na het eindsignaal mag het eindscherm niet sluiten"
+    run(g, 1.0)
+    g.step(1 / 60, [tap, tap])  # dubbele muis-/touchevent in één frame telt maar één keer
+    assert top(g) is isl, "tik sluit het voetbaleindscherm"
+
+    # (c) menu: joystick omlaag -> één K_DOWN, herhaling na 0.4 s
+    g.push(scenes.Pause(g))
+    frame()
+    state.update(mx=0.0, my=1.0)
+    t = 0.0
+    first = frame()
+    assert [e.key for e in first] == [pygame.K_DOWN]
+    seen = []
+    for i in range(60):
+        ev = frame()
+        t += 1 / 60
+        seen += [(round(t, 3), e.key) for e in ev if e.type == pygame.KEYDOWN]
+    assert all(k == pygame.K_DOWN for _, k in seen)
+    assert 0.38 <= seen[0][0] <= 0.45, seen
+    assert 0.15 <= seen[1][0] - seen[0][0] <= 0.21, seen
+    state.update(mx=0.0, my=0.0)
+    assert frame() == []
+    state.update(mx=0.0, my=1.0)
+    assert [e.key for e in frame()] == [pygame.K_DOWN], "nieuwe duw = weer één event"
+    state.update(mx=0.0, my=0.0)
+    g.step(1 / 60, [key(pygame.K_ESCAPE)])
+    assert top(g) is isl
+
+    # (f) tik op het tweede Titel-item
+    g.replace(scenes.Title(g))
+    ti = top(g)
+    assert ti.has_save and ti.items[1] == "Nieuw avontuur"
+    rect = ti.rects()[1]
+    g.step(1 / 60, [pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=rect.center, button=1)])
+    assert ti.sel == 1 and isinstance(top(g), scenes.Confirm), type(top(g))
+    # Confirm: tik op "Nee" sluit zonder te overschrijven
+    cf = top(g)
+    g.step(1 / 60, [pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=cf.rects()[1].center, button=1)])
+    assert top(g) is ti
+    # Shop: eerste tik selecteert, tweede koopt
+    prof.berries = 5000
+    g.push(scenes.Shop(g))
+    sh = top(g)
+    r2 = sh.rects(len(sh.items()))[2]
+    hp0 = prof.spd_lvl
+    tap = pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=r2.center, button=1)
+    g.step(1 / 60, [tap])
+    assert sh.sel == 2 and prof.spd_lvl == hp0
+    g.step(1 / 60, [tap])
+    assert prof.spd_lvl == hp0 + 1
+    # Journal: tik op tab 2, tik buiten sluit
+    g.push(scenes.Journal(g))
+    jn = top(g)
+    g.step(1 / 60, [pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=jn.tab_rects()[2].center, button=1)])
+    assert jn.tab == 2
+    g.step(1 / 60, [pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=(5, 5), button=1)])
+    assert top(g) is not jn
+    print("touch-tests OK; modes:", modes)
 
 
 if __name__ == "__main__":

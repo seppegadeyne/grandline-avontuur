@@ -7,6 +7,7 @@ import pygame
 
 from .core import WEB, Profile, Sfx, font, panel, text
 from .settings import FPS, H, TITLE, W
+from .touch import TouchInput
 
 
 class Game:
@@ -23,6 +24,7 @@ class Game:
         self.stack = []
         self.toasts = []
         self.running = True
+        self.touch = TouchInput()
 
     # scènestapel
     def push(self, scene):
@@ -57,7 +59,13 @@ class Game:
             text(self.screen, msg, 28, col, (W // 2, y + 13), "center", bold=False)
 
     def step(self, dt, events):
+        tapped = False
         for e in events:
+            if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                # max. één tik per frame: sommige browsers sturen voor één touch zowel touch- als muisevents
+                if tapped:
+                    continue
+                tapped = True
             if e.type == pygame.QUIT:
                 self.profile.save()
                 self.running = False
@@ -80,7 +88,7 @@ class Game:
         self.push(Title(self))
         while self.running and self.stack:
             dt = min(self.clock.tick(FPS) / 1000, 0.05)
-            self.step(dt, pygame.event.get())
+            self.step(dt, pygame.event.get() + self.touch.poll(self, dt))
             await asyncio.sleep(0)
         self.profile.save()
         pygame.quit()

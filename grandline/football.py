@@ -6,7 +6,7 @@ import pygame
 from pygame.math import Vector2 as V
 
 from . import art
-from .core import Scene, check_challenges, dim, panel, text
+from .core import Scene, check_challenges, dim, panel, tap_pos, text
 from .settings import GOLD, H, ISLANDS, W, WHITE
 
 FIELD = pygame.Rect(70, 110, W - 140, H - 160)
@@ -70,6 +70,7 @@ class FootballScene(Scene):
         self.msg = "Aftrap!"
         self.t = 0.0
         self.over = False
+        self.over_t = 0.0
         self.particles = []
         self.charge = 0.0
         self.charging = False
@@ -91,7 +92,10 @@ class FootballScene(Scene):
 
     def handle(self, e):
         if self.over:
-            if e.type == pygame.KEYDOWN and e.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_e, pygame.K_ESCAPE):
+            # tik pas na 0,8 s: een muisklik/tik om te schieten mag het eindscherm niet meteen wegklikken
+            tapped = tap_pos(e) and self.t - self.over_t > 0.8
+            if tapped or (e.type == pygame.KEYDOWN and e.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_e,
+                                                                 pygame.K_ESCAPE)):
                 self.game.pop()
             return
         if e.type == pygame.KEYDOWN:
@@ -216,6 +220,8 @@ class FootballScene(Scene):
         keys = pygame.key.get_pressed()
         mv = V((keys[pygame.K_d] or keys[pygame.K_RIGHT]) - (keys[pygame.K_a] or keys[pygame.K_q] or keys[pygame.K_LEFT]),
                (keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_z] or keys[pygame.K_UP]))
+        if mv.length_squared() == 0:
+            mv = V(self.game.touch.move)  # touch-joystick als er geen toets is ingedrukt
         me = self.me
         me.moving = mv.length_squared() > 0
         if me.moving:
@@ -286,6 +292,7 @@ class FootballScene(Scene):
         if self.over:
             return
         self.over = True
+        self.over_t = self.t
         prof = self.game.profile
         prof.matches += 1
         prof.best_match_goals = max(prof.best_match_goals, self.score[0])

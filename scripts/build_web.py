@@ -31,6 +31,7 @@ def main():
            "--title", "Grand Line Avontuur",
            "--package", "be.gadeyne.grandline",
            "--ume_block", "1",
+           "--template", str(ROOT / "web" / "index.tmpl"),  # eigen pagina met touch-besturing
            str(STAGE)]
     print("+", " ".join(cmd), flush=True)
     subprocess.run(cmd, check=True, cwd=STAGE)

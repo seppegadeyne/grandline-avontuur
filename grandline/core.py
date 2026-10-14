@@ -335,5 +335,12 @@ def is_confirm(e):
     return e.type == pygame.KEYDOWN and e.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE, pygame.K_e)
 
 
+def tap_pos(e):
+    """Positie (spelcoördinaten) van een tik/linkermuisklik, anders None."""
+    if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+        return e.pos
+    return None
+
+
 def is_back(e):
     return e.type == pygame.KEYDOWN and e.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE)

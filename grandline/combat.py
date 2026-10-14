@@ -559,6 +559,8 @@ class CombatScene(Scene):
             (keys[pygame.K_d] or keys[pygame.K_RIGHT]) - (keys[pygame.K_a] or keys[pygame.K_q] or keys[pygame.K_LEFT]),
             (keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_z] or keys[pygame.K_UP]),
         )
+        if mv.length_squared() == 0:
+            mv = V(self.game.touch.move)  # touch-joystick als er geen toets is ingedrukt
         p.moving = mv.length_squared() > 0
         if p.moving:
             p.facing = unit(mv)

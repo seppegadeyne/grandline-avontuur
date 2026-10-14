@@ -7,7 +7,7 @@ from pygame.math import Vector2 as V
 
 from . import art
 from .combat import draw_weapon_icon
-from .core import WEB, Profile, Scene, check_challenges, dim, is_back, is_confirm, panel, text, wrap
+from .core import WEB, Profile, Scene, check_challenges, dim, is_back, is_confirm, panel, tap_pos, text, wrap
 from .settings import (BOSSES, CHALLENGES, ENEMY_TYPES, GOLD, H, ISLANDS, RESEARCH_KILLS, TITLE, W, WEAPON_ORDER,
                        WEAPONS, WHITE)
 
@@ -19,6 +19,16 @@ def nav(e, n, sel):
         if e.key in (pygame.K_DOWN, pygame.K_s):
             return (sel + 1) % n
     return sel
+
+
+def tap_row(e, rects):
+    """Index van de rij die getikt is (linkermuisknop/touch), anders None."""
+    pos = tap_pos(e)
+    if pos:
+        for i, r in enumerate(rects):
+            if r.collidepoint(pos):
+                return i
+    return None
 
 
 def draw_sea(s, t):
@@ -44,7 +54,11 @@ class Title(Scene):
 
     def handle(self, e):
         self.sel = nav(e, len(self.items), self.sel)
-        if is_confirm(e):
+        go = is_confirm(e)
+        hit = tap_row(e, self.rects())
+        if hit is not None:
+            self.sel, go = hit, True
+        if go:
             self.game.sfx.play("select")
             item = self.items[self.sel]
             if item == "Verder spelen":
@@ -59,6 +73,9 @@ class Title(Scene):
                 self.game.push(Help(self.game))
             else:
                 self.game.running = False
+
+    def rects(self):
+        return [pygame.Rect(W // 2 - 170, 410 + i * 44 - 22, 340, 44) for i in range(len(self.items))]
 
     def new_game(self):
         self.game.profile = Profile()
@@ -110,13 +127,16 @@ class Help(Scene):
         ("Pauze / terug", "Esc"),
     ]
 
+    PANEL = pygame.Rect(W // 2 - 420, 80, 840, 560)
+
     def handle(self, e):
-        if is_back(e) or is_confirm(e):
+        pos = tap_pos(e)
+        if is_back(e) or is_confirm(e) or pos:  # tik (ook buiten het paneel) sluit
             self.game.pop()
 
     def draw(self, s):
         dim(s, 170)
-        panel(s, (W // 2 - 420, 80, 840, 560))
+        panel(s, self.PANEL)
         text(s, "Besturing", 50, GOLD, (W // 2, 120), "center", bold=True)
         for i, (a, b) in enumerate(self.LINES):
             text(s, a, 28, GOLD, (W // 2 - 380, 170 + i * 38))
@@ -277,13 +297,23 @@ class Riddle(Scene):
 
     def handle(self, e):
         self.sel = nav(e, len(self.opts), self.sel)
-        if e.type == pygame.KEYDOWN and pygame.K_1 <= e.key <= pygame.K_3:
+        hit = tap_row(e, self.rects())
+        if hit is not None:
+            self.sel = hit
+            self.answer()
+        elif e.type == pygame.KEYDOWN and pygame.K_1 <= e.key <= pygame.K_3:
             self.sel = e.key - pygame.K_1
             self.answer()
         elif is_confirm(e):
             self.answer()
         elif is_back(e):
             self.game.pop()
+
+    PANEL = pygame.Rect(W // 2 - 440, 150, 880, 400)
+
+    def rects(self):
+        r = self.PANEL
+        return [pygame.Rect(r.x + 120, r.y + 190 + k * 58, r.w - 240, 48) for k in range(len(self.opts))]
 
     def answer(self):
         ok = self.opts[self.sel] == self.correct
@@ -294,14 +324,14 @@ class Riddle(Scene):
 
     def draw(self, s):
         dim(s, 150)
-        r = pygame.Rect(W // 2 - 440, 150, 880, 400)
+        r = self.PANEL
         panel(s, r)
         text(s, "ONDERZOEK", 44, (120, 220, 255), (W // 2, r.y + 36), "center", bold=True)
         for k, ln in enumerate(wrap(self.q, 32, r.w - 80)):
             text(s, ln, 32, WHITE, (W // 2, r.y + 90 + k * 34), "center")
         for k, o in enumerate(self.opts):
             sel = k == self.sel
-            rr = pygame.Rect(r.x + 120, r.y + 190 + k * 58, r.w - 240, 48)
+            rr = self.rects()[k]
             panel(s, rr, color=(50, 70, 120) if sel else (30, 35, 55), alpha=240, border=GOLD if sel else (90, 90, 110),
                   radius=10, width=2)
             text(s, f"{k + 1}. {o}", 30, GOLD if sel else WHITE, rr.center, "center", bold=sel)
@@ -339,11 +369,23 @@ class Shop(Scene):
     def handle(self, e):
         its = self.items()
         self.sel = nav(e, len(its), self.sel)
+        hit = tap_row(e, self.rects(len(its)))
         if is_back(e):
             self.game.profile.save()
             self.game.pop()
+        elif hit is not None:
+            # eerste tik selecteert, tik op de gekozen rij koopt
+            if hit == self.sel:
+                self.buy(its[hit])
+            self.sel = hit
         elif is_confirm(e):
             self.buy(its[self.sel])
+
+    PANEL = pygame.Rect(W // 2 - 520, 40, 1040, 640)
+
+    def rects(self, n):
+        r = self.PANEL
+        return [pygame.Rect(r.x + 30, r.y + 100 + k * 48, r.w - 60, 42) for k in range(n)]
 
     def buy(self, it):
         p = self.game.profile
@@ -380,15 +422,16 @@ class Shop(Scene):
     def draw(self, s):
         dim(s, 160)
         p = self.game.profile
-        r = pygame.Rect(W // 2 - 520, 40, 1040, 640)
+        r = self.PANEL
         panel(s, r)
         text(s, "WINKEL", 52, GOLD, (r.x + 30, r.y + 18), bold=True)
         text(s, f"Berries: {p.berries}", 36, GOLD, (r.right - 30, r.y + 26), "topright", bold=True)
         text(s, f"HP {p.hp}/{p.max_hp}   Schade x{p.dmg_mult:.2f}", 24, WHITE, (r.right - 30, r.y + 62), "topright")
         its = self.items()
+        rects = self.rects(len(its))
         for k, it in enumerate(its):
             sel = k == self.sel
-            rr = pygame.Rect(r.x + 30, r.y + 100 + k * 48, r.w - 60, 42)
+            rr = rects[k]
             afford = p.berries >= it["price"]
             panel(s, rr, color=(50, 70, 120) if sel else (28, 32, 52), alpha=240, border=GOLD if sel else (70, 70, 90),
                   radius=8, width=2 if sel else 1)
@@ -413,7 +456,20 @@ class Journal(Scene):
         super().__init__(game)
         self.tab = 0
 
+    PANEL = pygame.Rect(W // 2 - 540, 30, 1080, 660)
+
+    def tab_rects(self):
+        r = self.PANEL
+        return [pygame.Rect(r.x + 30 + k * 220, r.y + 70, 210, 40) for k in range(len(self.TABS))]
+
     def handle(self, e):
+        pos = tap_pos(e)
+        if pos:
+            hit = tap_row(e, self.tab_rects())
+            if hit is not None:
+                self.tab = hit
+            elif not self.PANEL.collidepoint(pos):
+                self.game.pop()
         if e.type == pygame.KEYDOWN:
             if e.key in (pygame.K_LEFT, pygame.K_a, pygame.K_q):
                 self.tab = (self.tab - 1) % 3
@@ -425,12 +481,12 @@ class Journal(Scene):
     def draw(self, s):
         dim(s, 170)
         p = self.game.profile
-        r = pygame.Rect(W // 2 - 540, 30, 1080, 660)
+        r = self.PANEL
         panel(s, r)
         text(s, "DAGBOEK VAN DE KAPITEIN", 44, GOLD, (r.x + 30, r.y + 18), bold=True)
         for k, name in enumerate(self.TABS):
             sel = k == self.tab
-            tr = pygame.Rect(r.x + 30 + k * 220, r.y + 70, 210, 40)
+            tr = self.tab_rects()[k]
             panel(s, tr, color=(60, 80, 140) if sel else (30, 34, 54), alpha=255, border=GOLD if sel else (80, 80, 100),
                   radius=8, width=2)
             text(s, name, 28, GOLD if sel else WHITE, tr.center, "center", bold=sel)
@@ -501,9 +557,12 @@ class Pause(Scene):
 
     def handle(self, e):
         self.sel = nav(e, len(self.items), self.sel)
+        hit = tap_row(e, self.rects())
+        if hit is not None:
+            self.sel = hit
         if is_back(e):
             self.game.pop()
-        elif is_confirm(e):
+        elif is_confirm(e) or hit is not None:
             it = self.items[self.sel]
             g = self.game
             if it == "Verder":
@@ -520,6 +579,10 @@ class Pause(Scene):
             else:
                 g.profile.save()
                 g.running = False
+
+    def rects(self):
+        top = H // 2 - (90 + 50 * len(self.items)) // 2
+        return [pygame.Rect(W // 2 - 200, top + 95 + i * 50 - 25, 400, 50) for i in range(len(self.items))]
 
     def draw(self, s):
         dim(s, 150)
@@ -541,12 +604,18 @@ class Confirm(Scene):
     def handle(self, e):
         if e.type == pygame.KEYDOWN and e.key in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_a, pygame.K_d, pygame.K_q):
             self.sel ^= 1
+        hit = tap_row(e, self.rects())
+        if hit is not None:
+            self.sel = hit
         if is_back(e):
             self.game.pop()
-        elif is_confirm(e):
+        elif is_confirm(e) or hit is not None:
             self.game.pop()
             if self.sel == 0:
                 self.on_yes()
+
+    def rects(self):
+        return [pygame.Rect(W // 2 - 80 + i * 160 - 70, H // 2 + 35 - 25, 140, 50) for i in range(2)]
 
     def draw(self, s):
         dim(s, 150)
@@ -573,7 +642,7 @@ class GameOver(Scene):
         self.t += dt
 
     def handle(self, e):
-        if self.t > 0.8 and is_confirm(e):
+        if self.t > 0.8 and (is_confirm(e) or tap_pos(e)):
             g = self.game
             p = g.profile
             p.hp = p.max_hp
@@ -614,7 +683,7 @@ class Victory(Scene):
                 c[1] = -10
 
     def handle(self, e):
-        if self.t > 2 and is_confirm(e):
+        if self.t > 2 and (is_confirm(e) or tap_pos(e)):
             self.game.replace(WorldMap(self.game))
 
     def draw(self, s):
