@@ -1,0 +1,7 @@
+.venv
+.web-build
+public
+build
+tests
+**/__pycache__
+.env*
