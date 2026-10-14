@@ -1,0 +1,16 @@
+[project]
+name = "grandline-avontuur"
+version = "0.1.0"
+description = "Grand Line Avontuur: a One Piece-inspired action adventure game (pygame-ce), playable in the browser via WebAssembly."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Seppe Gadeyne" }]
+requires-python = ">=3.13"
+dependencies = [
+    "pygame-ce>=2.5.8",
+]
+
+[dependency-groups]
+dev = [
+    "pygbag==0.9.3",
+]
