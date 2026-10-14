@@ -17,7 +17,10 @@ class Game:
                                   "wayland,x11" if os.environ.get("WAYLAND_DISPLAY") else "x11")
         pygame.init()
         pygame.display.set_caption(TITLE)
-        self.screen = pygame.display.set_mode((W, H), pygame.SCALED | pygame.RESIZABLE)
+        # In de browser schaalt de pagina (CSS) het canvas; met RESIZABLE zou SDL het canvas zelf vergroten
+        # en het beeld onvergroot met zwarte randen in het midden tekenen.
+        flags = pygame.SCALED if WEB else pygame.SCALED | pygame.RESIZABLE
+        self.screen = pygame.display.set_mode((W, H), flags)
         self.clock = pygame.time.Clock()
         self.sfx = Sfx()
         self.profile = Profile.load() or Profile()
